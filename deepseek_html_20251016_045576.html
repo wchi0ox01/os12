@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ลงทะเบียนนักเรียน - ระบบเช็คชื่ออัจฉริยะ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <style>
+        body { font-family: 'Inter', 'Kanit', sans-serif; }
+        .loader { border-top-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <i data-lucide="user-plus" class="w-12 h-12 text-blue-600 mx-auto mb-4"></i>
+            <h1 class="text-2xl font-bold text-gray-800">ลงทะเบียนนักเรียน</h1>
+            <p class="text-gray-600 mt-2">กรุณากรอกข้อมูลให้ครบถ้วน</p>
+        </div>
+
+        <!-- Registration Form -->
+        <form id="registration-form" class="space-y-6">
+            <!-- Student ID -->
+            <div>
+                <label for="student-id" class="block text-sm font-medium text-gray-700 mb-2">
+                    รหัสนักเรียน *
+                </label>
+                <input 
+                    type="text" 
+                    id="student-id" 
+                    required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    placeholder="ระบุรหัสนักเรียน"
+                >
+            </div>
+
+            <!-- Name -->
+            <div>
+                <label for="student-name" class="block text-sm font-medium text-gray-700 mb-2">
+                    ชื่อ-สกุล *
+                </label>
+                <input 
+                    type="text" 
+                    id="student-name" 
+                    required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    placeholder="ชื่อ-สกุลนักเรียน"
+                >
+            </div>
+
+            <!-- Education Level -->
+            <div>
+                <label for="education-level" class="block text-sm font-medium text-gray-700 mb-2">
+                    ระดับชั้น *
+                </label>
+                <select 
+                    id="education-level" 
+                    required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                >
+                    <option value="">เลือกระดับชั้น</option>
+                    <option value="ปวช.">ปวช.</option>
+                    <option value="ปวส.">ปวส.</option>
+                </select>
+            </div>
+
+            <!-- Department -->
+            <div>
+                <label for="department" class="block text-sm font-medium text-gray-700 mb-2">
+                    แผนก *
+                </label>
+                <select 
+                    id="department" 
+                    required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                >
+                    <option value="">เลือกแผนก</option>
+                    <option value="คอมพิวเตอร์ธุรกิจ">คอมพิวเตอร์ธุรกิจ</option>
+                    <option value="การบัญชี">การบัญชี</option>
+                    <option value="การตลาด">การตลาด</option>
+                    <option value="การโรงแรม">การโรงแรม</option>
+                </select>
+            </div>
+
+            <!-- Photo Capture Section -->
+            <div class="border-t pt-6">
+                <label class="block text-sm font-medium text-gray-700 mb-4">
+                    ถ่ายภาพใบหน้า *
+                </label>
+                
+                <!-- Camera Preview -->
+                <div class="bg-gray-100 rounded-lg p-4 mb-4">
+                    <div id="camera-container" class="relative">
+                        <div id="camera-loading" class="text-center py-8">
+                            <div class="loader w-8 h-8 rounded-full border-4 border-gray-300 mx-auto mb-2"></div>
+                            <p class="text-sm text-gray-600">กำลังเตรียมกล้อง...</p>
+                        </div>
+                        <video id="camera-preview" class="w-full h-64 object-cover rounded-lg hidden"></video>
+                        <canvas id="capture-canvas" class="hidden"></canvas>
+                    </div>
+                </div>
+
+                <!-- Capture Button -->
+                <button 
+                    type="button" 
+                    id="capture-btn"
+                    onclick="capturePhoto()"
+                    class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 font-medium"
+                >
+                    <i data-lucide="camera" class="w-5 h-5"></i>
+                    ถ่ายภาพใบหน้า
+                </button>
+
+                <!-- Retake Button -->
+                <button 
+                    type="button" 
+                    id="retake-btn"
+                    onclick="retakePhoto()"
+                    class="w-full bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 font-medium hidden mt-2"
+                >
+                    <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                    ถ่ายใหม่
+                </button>
+
+                <!-- Photo Preview -->
+                <div id="photo-preview" class="hidden mt-4 text-center">
+                    <p class="text-sm text-green-600 mb-2">✓ ถ่ายภาพสำเร็จแล้ว</p>
+                    <img id="preview-image" class="w-32 h-32 object-cover rounded-lg mx-auto border-2 border-green-500">
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button 
+                type="submit"
+                id="submit-btn"
+                class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
+            >
+                <i data-lucide="save" class="w-5 h-5"></i>
+                ลงทะเบียน
+            </button>
+        </form>
+
+        <!-- Admin Link (Hidden from students) -->
+        <div class="text-center mt-6 pt-6 border-t">
+            <a href="admin.html" class="text-sm text-gray-500 hover:text-gray-700">
+                เข้าสู่ระบบผู้ดูแล
+            </a>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+            <div class="bg-white rounded-lg p-6 text-center">
+                <div class="loader w-12 h-12 rounded-full border-4 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-gray-700">กำลังบันทึกข้อมูล...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize icons
+        lucide.createIcons();
+
+        // Global variables
+        let cameraStream = null;
+        let capturedPhotoData = null;
+
+        // Initialize camera on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            await initializeCamera();
+        });
+
+        // Initialize camera
+        async function initializeCamera() {
+            try {
+                const video = document.getElementById('camera-preview');
+                const loading = document.getElementById('camera-loading');
+                
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    } 
+                });
+                
+                video.srcObject = cameraStream;
+                video.classList.remove('hidden');
+                loading.classList.add('hidden');
+                
+                await video.play();
+            } catch (error) {
+                console.error('Camera error:', error);
+                document.getElementById('camera-loading').innerHTML = `
+                    <div class="text-center text-red-600">
+                        <i data-lucide="camera-off" class="w-8 h-8 mx-auto mb-2"></i>
+                        <p class="text-sm">ไม่สามารถเปิดกล้องได้</p>
+                    </div>
+                `;
+                lucide.createIcons();
+            }
+        }
+
+        // Capture photo
+        function capturePhoto() {
+            if (!cameraStream) {
+                alert('กรุณาอนุญาตการเข้าถึงกล้องก่อน');
+                return;
+            }
+
+            const video = document.getElementById('camera-preview');
+            const canvas = document.getElementById('capture-canvas');
+            const preview = document.getElementById('preview-image');
+            
+            // Set canvas size to match video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // Draw current video frame to canvas
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Get image data URL
+            capturedPhotoData = canvas.toDataURL('image/jpeg');
+            preview.src = capturedPhotoData;
+            
+            // Show preview and retake button
+            document.getElementById('photo-preview').classList.remove('hidden');
+            document.getElementById('retake-btn').classList.remove('hidden');
+            document.getElementById('capture-btn').classList.add('hidden');
+            
+            // Stop camera stream to save resources
+            stopCamera();
+        }
+
+        // Retake photo
+        function retakePhoto() {
+            capturedPhotoData = null;
+            document.getElementById('photo-preview').classList.add('hidden');
+            document.getElementById('retake-btn').classList.add('hidden');
+            document.getElementById('capture-btn').classList.remove('hidden');
+            
+            // Restart camera
+            initializeCamera();
+        }
+
+        // Stop camera
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('registration-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!capturedPhotoData) {
+                alert('กรุณาถ่ายภาพใบหน้าก่อนดำเนินการต่อ');
+                return;
+            }
+
+            const formData = {
+                id: document.getElementById('student-id').value.trim(),
+                name: document.getElementById('student-name').value.trim(),
+                level: document.getElementById('education-level').value,
+                department: document.getElementById('department').value,
+                imageData: capturedPhotoData
+            };
+
+            // Validate form
+            if (!formData.id || !formData.name || !formData.level || !formData.department) {
+                alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading-overlay').classList.remove('hidden');
+
+            try {
+                // Combine level and department for class field
+                const studentClass = `${formData.level} ${formData.department}`;
+                
+                // Prepare data for API
+                const apiData = {
+                    id: formData.id,
+                    name: formData.name,
+                    class: studentClass,
+                    imageData: formData.imageData
+                };
+
+                // Get GAS URL from localStorage
+                const gasWebAppUrl = localStorage.getItem('gasWebAppUrl');
+                if (!gasWebAppUrl) {
+                    throw new Error('ระบบยังไม่ได้ตั้งค่า กรุณาติดต่อผู้ดูแลระบบ');
+                }
+
+                // Send to Google Apps Script
+                const response = await fetch(gasWebAppUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify({
+                        action: 'addStudent',
+                        data: apiData
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Store student ID in localStorage for scan page
+                    localStorage.setItem('currentStudentId', formData.id);
+                    localStorage.setItem('currentStudentName', formData.name);
+                    
+                    // Redirect to scan page
+                    window.location.href = 'scan.html';
+                } else {
+                    throw new Error(result.error || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+                }
+
+            } catch (error) {
+                console.error('Registration error:', error);
+                alert('เกิดข้อผิดพลาด: ' + error.message);
+            } finally {
+                document.getElementById('loading-overlay').classList.add('hidden');
+            }
+        });
+
+        // Clean up camera when leaving page
+        window.addEventListener('beforeunload', () => {
+            stopCamera();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ผู้ดูแลระบบ - ระบบเช็คชื่ออัจฉริยะ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', 'Kanit', sans-serif; }
+        .loader { border-top-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Setup Modal -->
+    <div id="setup-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 sm:p-8 max-w-lg w-full">
+            <div class="text-center mb-6">
+                <i data-lucide="settings" class="w-12 h-12 text-blue-600 mx-auto mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-800">ตั้งค่าระบบครั้งแรก</h2>
+                <p class="text-gray-600 mt-2">กรุณานำ URL ของ Google Apps Script Web App ที่ได้จากการ Deploy มาวางที่นี่</p>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label for="gas-url" class="block font-medium mb-2 text-gray-700">Google Apps Script URL:</label>
+                    <input 
+                        type="url" 
+                        id="gas-url" 
+                        placeholder="https://script.google.com/macros/s/..."
+                        class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                    <p class="text-sm text-gray-500 mt-1">เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถตั้งค่านี้ได้</p>
+                </div>
+                
+                <button 
+                    onclick="saveGasUrl()" 
+                    class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                    บันทึกและเริ่มต้นใช้งาน
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4">
+        <!-- Header -->
+        <header class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="flex items-center space-x-3">
+                    <i data-lucide="settings" class="text-blue-600 w-8 h-8"></i>
+                    <h1 class="text-xl font-bold text-gray-800">ผู้ดูแลระบบ</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="scan.html" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm">
+                        <i data-lucide="scan-face"></i>
+                        สแกนหน้า
+                    </a>
+                    <a href="index.html" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm">
+                        <i data-lucide="user-plus"></i>
+                        ลงทะเบียน
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-white rounded-lg shadow-md p-2 mb-6">
+            <nav class="flex space-x-1">
+                <button 
+                    onclick="switchAdminTab('dashboard')" 
+                    id="admin-tab-dashboard"
+                    class="flex-1 py-3 px-4 text-center font-medium rounded-md bg-blue-600 text-white"
+                >
+                    <i data-lucide="layout-dashboard" class="w-4 h-4 inline mr-2"></i>
+                    แดชบอร์ด
+                </button>
+                <button 
+                    onclick="switchAdminTab('manage')" 
+                    id="admin-tab-manage"
+                    class="flex-1 py-3 px-4 text-center font-medium rounded-md text-gray-600 hover:bg-gray-100"
+                >
+                    <i data-lucide="users" class="w-4 h-4 inline mr-2"></i>
+                    จัดการนักเรียน
+                </button>
+                <button 
+                    onclick="switchAdminTab('attendance')" 
+                    id="admin-tab-attendance"
+                    class="flex-1 py-3 px-4 text-center font-medium rounded-md text-gray-600 hover:bg-gray-100"
+                >
+                    <i data-lucide="clipboard-list" class="w-4 h-4 inline mr-2"></i>
+                    ประวัติเช็คชื่อ
+                </button>
+                <button 
+                    onclick="switchAdminTab('settings')" 
+                    id="admin-tab-settings"
+                    class="flex-1 py-3 px-4 text-center font-medium rounded-md text-gray-600 hover:bg-gray-100"
+                >
+                    <i data-lucide="settings" class="w-4 h-4 inline mr-2"></i>
+                    ตั้งค่าระบบ
+                </button>
+            </nav>
+        </div>
+
+        <!-- Admin Content -->
+        <main>
+            <!-- Dashboard Tab -->
+            <div id="admin-content-dashboard" class="space-y-6">
+                <!-- Statistics Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                        <div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="users" class="text-blue-600 w-6 h-6"></i>
+                        </div>
+                        <p class="text-2xl font-bold text-gray-800" id="total-students">0</p>
+                        <p class="text-gray-600">นักเรียนทั้งหมด</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                        <div class="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="user-check" class="text-green-600 w-6 h-6"></i>
+                        </div>
+                        <p class="text-2xl font-bold text-gray-800" id="present-today">0</p>
+                        <p class="text-gray-600">มาเรียนวันนี้</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                        <div class="bg-yellow-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="clock" class="text-yellow-600 w-6 h-6"></i>
+                        </div>
+                        <p class="text-2xl font-bold text-gray-800" id="late-today">0</p>
+                        <p class="text-gray-600">มาสายวันนี้</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                        <div class="bg-red-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="user-x" class="text-red-600 w-6 h-6"></i>
+                        </div>
+                        <p class="text-2xl font-bold text-gray-800" id="absent-today">0</p>
+                        <p class="text-gray-600">ขาดเรียนวันนี้</p>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Attendance Chart -->
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold mb-4">สรุปการเข้าเรียน</h3>
+                        <canvas id="attendance-chart" height="250"></canvas>
+                    </div>
+                    
+                    <!-- Recent Activity -->
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold mb-4">กิจกรรมล่าสุด</h3>
+                        <div id="recent-activity" class="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+                            <div class="text-center py-8">
+                                <div class="loader w-8 h-8 rounded-full border-4 border-gray-300 mx-auto mb-2"></div>
+                                <p class="text-gray-500">กำลังโหลด...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manage Students Tab -->
+            <div id="admin-content-manage" class="hidden">
+                <div class="bg-white rounded-lg shadow-md">
+                    <div class="p-6 border-b">
+                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <h2 class="text-lg font-semibold">จัดการข้อมูลนักเรียน</h2>
+                            <div class="flex gap-2">
+                                <button 
+                                    onclick="exportStudentData()"
+                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 text-sm"
+                                >
+                                    <i data-lucide="download"></i>
+                                    ส่งออกข้อมูล
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="p-3 text-sm font-semibold">รหัสนักเรียน</th>
+                                        <th class="p-3 text-sm font-semibold">ชื่อ-สกุล</th>
+                                        <th class="p-3 text-sm font-semibold">ระดับชั้น/แผนก</th>
+                                        <th class="p-3 text-sm font-semibold text-center">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="students-table-body">
+                                    <tr>
+                                        <td colspan="4" class="p-8 text-center">
+                                            <div class="loader w-8 h-8 rounded-full border-4 border-gray-300 mx-auto mb-2"></div>
+                                            <p class="text-gray-500">กำลังโหลดข้อมูลนักเรียน...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attendance History Tab -->
+            <div id="admin-content-attendance" class="hidden">
+                <div class="bg-white rounded-lg shadow-md">
+                    <div class="p-6 border-b">
+                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <h2 class="text-lg font-semibold">ประวัติการเช็คชื่อ</h2>
+                            <div class="flex gap-2">
+                                <input 
+                                    type="date" 
+                                    id="attendance-date-filter"
+                                    class="border rounded-lg p-2 text-sm"
+                                >
+                                <button 
+                                    onclick="exportAttendanceData()"
+                                    class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 text-sm"
+                                >
+                                    <i data-lucide="download"></i>
+                                    ส่งออก
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="p-3 text-sm font-semibold">รหัสนักเรียน</th>
+                                        <th class="p-3 text-sm font-semibold">ชื่อ-สกุล</th>
+                                        <th class="p-3 text-sm font-semibold">วันที่/เวลา</th>
+                                        <th class="p-3 text-sm font-semibold">สถานะ</th>
+                                        <th class="p-3 text-sm font-semibold">ตำแหน่ง</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendance-table-body">
+                                    <tr>
+                                        <td colspan="5" class="p-8 text-center">
+                                            <div class="loader w-8 h-8 rounded-full border-4 border-gray-300 mx-auto mb-2"></div>
+                                            <p class="text-gray-500">กำลังโหลดประวัติการเช็คชื่อ...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="admin-content-settings" class="hidden">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-lg font-semibold mb-6">ตั้งค่าระบบ</h2>
+                    
+                    <div class="space-y-6">
+                        <!-- Current GAS URL -->
+                        <div class="border rounded-lg p-4">
+                            <h3 class="font-medium mb-3">การตั้งค่า Google Apps Script</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">URL ปัจจุบัน:</label>
+                                    <div class="flex items-center gap-2">
+                                        <code id="current-gas-url" class="flex-1 bg-gray-100 p-2 rounded text-sm truncate">
+                                            ยังไม่ได้ตั้งค่า
+                                        </code>
+                                        <button 
+                                            onclick="resetGasUrl()"
+                                            class="bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700"
+                                        >
+                                            ล้างการตั้งค่า
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Setup Form -->
+                                <div class="border-t pt-4 mt-4">
+                                    <h4 class="font-medium mb-3">ตั้งค่า URL ใหม่</h4>
+                                    <div class="space-y-3">
+                                        <input 
+                                            type="url" 
+                                            id="new-gas-url"
+                                            placeholder="https://script.google.com/macros/s/..."
+                                            class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        >
+                                        <button 
+                                            onclick="updateGasUrl()"
+                                            class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            อัพเดท URL
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- System Information -->
+                        <div class="border rounded-lg p-4">
+                            <h3 class="font-medium mb-3">ข้อมูลระบบ</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p class="text-gray-600">เวอร์ชันระบบ:</p>
+                                    <p class="font-medium">1.0.0</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">สถานะการเชื่อมต่อ:</p>
+                                    <p id="connection-status" class="font-medium text-yellow-600">กำลังตรวจสอบ...</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">จำนวนนักเรียนในระบบ:</p>
+                                    <p id="system-student-count" class="font-medium">-</p>
+                                </div>
+                                <div>
+                                    <p class="text-gray-600">จำนวนการเช็คชื่อ:</p>
+                                    <p id="system-attendance-count" class="font-medium">-</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="border rounded-lg p-4">
+                            <h3 class="font-medium mb-3">การดำเนินการ</h3>
+                            <div class="space-y-3">
+                                <button 
+                                    onclick="testConnection()"
+                                    class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <i data-lucide="wifi"></i>
+                                    ทดสอบการเชื่อมต่อ
+                                </button>
+                                <button 
+                                    onclick="clearAllData()"
+                                    class="w-full bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <i data-lucide="trash-2"></i>
+                                    ล้างข้อมูลทั้งหมด
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Global variables
+        let students = [];
+        let attendance = [];
+        let attendanceChart = null;
+
+        // Initialize icons
+        lucide.createIcons();
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Check if GAS URL is set
+            const gasWebAppUrl = localStorage.getItem('gasWebAppUrl');
+            if (!gasWebAppUrl) {
+                document.getElementById('setup-modal').classList.remove('hidden');
+            } else {
+                document.getElementById('setup-modal').classList.add('hidden');
+                await loadAllData();
+                updateSettingsInfo();
+            }
+        });
+
+        // Save GAS URL
+        function saveGasUrl() {
+            const url = document.getElementById('gas-url').value.trim();
+            if (url) {
+                localStorage.setItem('gasWebAppUrl', url);
+                document.getElementById('setup-modal').classList.add('hidden');
+                alert('ตั้งค่าระบบสำเร็จ!');
+                location.reload();
+            } else {
+                alert('กรุณากรอก URL ให้ถูกต้อง');
+            }
+        }
+
+        // Update GAS URL
+        function updateGasUrl() {
+            const url = document.getElementById('new-gas-url').value.trim();
+            if (url) {
+                localStorage.setItem('gasWebAppUrl', url);
+                alert('อัพเดท URL สำเร็จ!');
+                updateSettingsInfo();
+                document.getElementById('new-gas-url').value = '';
+            } else {
+                alert('กรุณากรอก URL ให้ถูกต้อง');
+            }
+        }
+
+        // Reset GAS URL
+        function resetGasUrl() {
+            if (confirm('คุณแน่ใจหรือไม่ที่จะล้างการตั้งค่า URL?')) {
+                localStorage.removeItem('gasWebAppUrl');
+                alert('ล้างการตั้งค่าสำเร็จ! ระบบจะรีเฟรชอัตโนมัติ');
+                location.reload();
+            }
+        }
+
+        // Update settings information
+        function updateSettingsInfo() {
+            const gasUrl = localStorage.getItem('gasWebAppUrl');
+            document.getElementById('current-gas-url').textContent = gasUrl || 'ยังไม่ได้ตั้งค่า';
+            
+            // Update system info
+            document.getElementById('system-student-count').textContent = students.length;
+            document.getElementById('system-attendance-count').textContent = attendance.length;
+            
+            // Test connection
+            testConnection();
+        }
+
+        // Test connection to GAS
+        async function testConnection() {
+            const statusElement = document.getElementById('connection-status');
+            statusElement.textContent = 'กำลังทดสอบ...';
+            statusElement.className = 'font-medium text-yellow-600';
+            
+            try {
+                const gasWebAppUrl = localStorage.getItem('gasWebAppUrl');
+                if (!gasWebAppUrl) {
+                    throw new Error('ไม่ได้ตั้งค่า URL');
+                }
+                
+                const response = await fetch(gasWebAppUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify({
+                        action: 'getStudents'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusElement.textContent = 'เชื่อมต่อสำเร็จ';
+                    statusElement.className = 'font-medium text-green-600';
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                statusElement.textContent = 'เชื่อมต่อล้มเหลว: ' + error.message;
+                statusElement.className = 'font-medium text-red-600';
+            }
+        }
+
+        // Clear all data
+        function clearAllData() {
+            if (confirm('⚠️ คำเตือน: การดำเนินการนี้จะล้างข้อมูลทั้งหมดรวมถึงข้อมูลนักเรียนและประวัติการเช็คชื่อ\n\nคุณแน่ใจหรือไม่?')) {
+                if (confirm('❌ การดำเนินการนี้ไม่สามารถย้อนกลับได้!\n\nพิมพ์ "DELETE" เพื่อยืนยัน:')) {
+                    // Implementation for clearing all data
+                    alert('ฟังก์ชันล้างข้อมูลทั้งหมด');
+                }
+            }
+        }
+
+        // Switch admin tabs
+        function switchAdminTab(tabName) {
+            // Update tab buttons
+            ['dashboard', 'manage', 'attendance', 'settings'].forEach(tab => {
+                const button = document.getElementById(`admin-tab-${tab}`);
+                const content = document.getElementById(`admin-content-${tab}`);
+                
+                if (tab === tabName) {
+                    button.classList.add('bg-blue-600', 'text-white');
+                    button.classList.remove('text-gray-600', 'hover:bg-gray-100');
+                    content.classList.remove('hidden');
+                } else {
+                    button.classList.remove('bg-blue-600', 'text-white');
+                    button.classList.add('text-gray-600', 'hover:bg-gray-100');
+                    content.classList.add('hidden');
+                }
+            });
+
+            // Load specific data for tab
+            if (tabName === 'manage') {
+                loadStudentsTable();
+            } else if (tabName === 'attendance') {
+                loadAttendanceTable();
+            } else if (tabName === 'settings') {
+                updateSettingsInfo();
+            }
+        }
+
+        // Load all data for dashboard
+        async function loadAllData() {
+            await Promise.all([
+                loadStudents(),
+                loadAttendance(),
+                loadRecentActivity()
+            ]);
+            
+            updateDashboardStats();
+            renderAttendanceChart();
+        }
+
+        // Load students data
+        async function loadStudents() {
+            try {
+                const gasWebAppUrl = localStorage.getItem('gasWebAppUrl');
+                if (!gasWebAppUrl) return;
+
+                const response = await fetch(gasWebAppUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify({
+                        action: 'getStudents'
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    students = result.data;
+                }
+            } catch (error) {
+                console.error('Error loading students:', error);
+            }
+        }
+
+        // Load attendance data
+        async function loadAttendance() {
+            try {
+                const gasWebAppUrl = localStorage.getItem('gasWebAppUrl');
+                if (!gasWebAppUrl) return;
+
+                const response = await fetch(gasWebAppUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify({
+                        action: 'getAttendance'
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    attendance = result.data;
+                }
+            } catch (error) {
+                console.error('Error loading attendance:', error);
+            }
+        }
+
+        // Update dashboard statistics
+        function updateDashboardStats() {
+            // Total students
+            document.getElementById('total-students').textContent = students.length;
+
+            // Today's stats
+            const today = new Date().toISOString().split('T')[0];
+            const todayAttendance = attendance.filter(record => 
+                record.timestamp && record.timestamp.startsWith(today)
+            );
+
+            const present = todayAttendance.filter(r => r.status === 'มาเรียน').length;
+            const late = todayAttendance.filter(r => r.status === 'มาสาย').length;
+            const absent = students.length - present - late;
+
+            document.getElementById('present-today').textContent = present;
+            document.getElementById('late-today').textContent = late;
+            document.getElementById('absent-today').textContent = Math.max(0, absent);
+        }
+
+        // Render attendance chart
+        function renderAttendanceChart() {
+            const ctx = document.getElementById('attendance-chart').getContext('2d');
+            
+            if (attendanceChart) {
+                attendanceChart.destroy();
+            }
+
+            // Get last 7 days data
+            const last7Days = Array.from({ length: 7 }, (_, i) => {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                return date.toISOString().split('T')[0];
+            }).reverse();
+
+            const dailyData = last7Days.map(date => {
+                const dayAttendance = attendance.filter(record => 
+                    record.timestamp && record.timestamp.startsWith(date)
+                );
+                return dayAttendance.filter(r => r.status === 'มาเรียน').length;
+            });
+
+            attendanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: last7Days.map(date => {
+                        const d = new Date(date);
+                        return d.toLocaleDateString('th-TH', { month: 'short', day: 'numeric' });
+                    }),
+                    datasets: [{
+                        label: 'จำนวนนักเรียนมาเรียน',
+                        data: dailyData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: students.length
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load recent activity
+        async function loadRecentActivity() {
+            const container = document.getElementById('recent-activity');
+            
+            if (!attendance || attendance.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">ไม่มีกิจกรรมล่าสุด</p>';
+                return;
+            }
+
+            // Get recent 10 activities
+            const recent = attendance
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                .slice(0, 10);
+
+            container.innerHTML = recent.map(record => {
+                const date = new Date(record.timestamp);
+                const timeString = date.toLocaleTimeString('th-TH');
+                const dateString = date.toLocaleDateString('th-TH');
+                
+                let statusColor = 'gray';
+                if (record.status === 'มาเรียน') statusColor = 'green';
+                else if (record.status === 'มาสาย') statusColor = 'yellow';
+                else if (record.status === 'ขาด') statusColor = 'red';
+
+                return `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-${statusColor}-100 rounded-full flex items-center justify-center">
+                                <i data-lucide="${record.status === 'มาเรียน' ? 'user-check' : 'user-x'}" 
+                                   class="w-5 h-5 text-${statusColor}-600"></i>
+                            </div>
+                            <div>
+                                <p class="font-medium">${record.name}</p>
+                                <p class="text-sm text-gray-600">${timeString}</p>
+                            </div>
+                        </div>
+                        <span class="px-2 py-1 bg-${statusColor}-100 text-${statusColor}-800 text-xs rounded-full">
+                            ${record.status}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // Load students table
+        async function loadStudentsTable() {
+            await loadStudents();
+            const container = document.getElementById('students-table-body');
+            
+            if (students.length === 0) {
+                container.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="p-8 text-center text-gray-500">
+                            ไม่พบข้อมูลนักเรียน
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            container.innerHTML = students.map(student => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3">${student.studentid}</td>
+                    <td class="p-3">${student.name}</td>
+                    <td class="p-3">${student.class}</td>
+                    <td class="p-3 text-center">
+                        <button 
+                            onclick="editStudent(${student.rowIndex})"
+                            class="text-blue-600 hover:text-blue-800 p-1"
+                        >
+                            <i data-lucide="edit" class="w-4 h-4"></i>
+                        </button>
+                        <button 
+                            onclick="deleteStudent(${student.rowIndex})"
+                            class="text-red-600 hover:text-red-800 p-1 ml-2"
+                        >
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        // Load attendance table
+        async function loadAttendanceTable() {
+            await loadAttendance();
+            const container = document.getElementById('attendance-table-body');
+            const dateFilter = document.getElementById('attendance-date-filter').value;
+            
+            let filteredAttendance = attendance;
+            if (dateFilter) {
+                filteredAttendance = attendance.filter(record =>
+                    record.timestamp && record.timestamp.startsWith(dateFilter)
+                );
+            }
+
+            if (filteredAttendance.length === 0) {
+                container.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="p-8 text-center text-gray-500">
+                            ไม่พบประวัติการเช็คชื่อ
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // Sort by timestamp descending
+            filteredAttendance.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            container.innerHTML = filteredAttendance.map(record => {
+                const date = new Date(record.timestamp);
+                const timeString = date.toLocaleTimeString('th-TH');
+                const dateString = date.toLocaleDateString('th-TH');
+                
+                let statusColor = 'gray';
+                if (record.status === 'มาเรียน') statusColor = 'green';
+                else if (record.status === 'มาสาย') statusColor = 'yellow';
+                else if (record.status === 'ขาด') statusColor = 'red';
+
+                return `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-3">${record.id}</td>
+                        <td class="p-3">${record.name}</td>
+                        <td class="p-3">
+                            <div>${dateString}</div>
+                            <div class="text-sm text-gray-600">${timeString}</div>
+                        </td>
+                        <td class="p-3">
+                            <span class="px-2 py-1 bg-${statusColor}-100 text-${statusColor}-800 text-xs rounded-full">
+                                ${record.status}
+                            </span>
+                        </td>
+                        <td class="p-3 text-sm text-gray-600">${record.location || 'N/A'}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+
+        // Export functions
+        function exportStudentData() {
+            alert('ฟังก์ชันส่งออกข้อมูลนักเรียน');
+        }
+
+        function exportAttendanceData() {
+            alert('ฟังก์ชันส่งออกประวัติเช็คชื่อ');
+        }
+
+        // Student management functions
+        function editStudent(rowIndex) {
+            alert('ฟังก์ชันแก้ไขนักเรียน: ' + rowIndex);
+        }
+
+        function deleteStudent(rowIndex) {
+            if (confirm('คุณแน่ใจหรือไม่ที่จะลบนักเรียนคนนี้?')) {
+                alert('ฟังก์ชันลบนักเรียน: ' + rowIndex);
+            }
+        }
+
+        // Add event listener for date filter
+        document.getElementById('attendance-date-filter').addEventListener('change', loadAttendanceTable);
+    </script>
+</body>
+</html>
